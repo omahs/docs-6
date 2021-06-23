@@ -3,31 +3,38 @@
 - [Source code](https://github.com/lidofinance/lido-dao/blob/master/contracts/0.4.24/Lido.sol)
 - [Deployed contract](https://etherscan.io/address/0xae7ab96520de3a18e5e111b5eaab095312d7fe84)
 
-Lido is the core contract which acts as a liquid staking pool. The contract is responsible for Ether deposits and withdrawals, minting and burning liquid tokens, delegating funds to node operators, applying fees, and accepting updates from the oracle contract. Node Operators' logic is extracted to a separate contract, NodeOperatorsRegistry.
+Lido contract is the core protocol contract acting as a liquid staking pool. The contract is responsible for Ether deposits and withdrawals, minting and burning liquid tokens, delegating funds to node operators, applying fees, and accepting updates from the oracle contract. Node Operators' logic constitutes a separate contract, [NodeOperatorsRegistry](https://docs.lido.fi/contracts/node-operators-registry).
 
-Lido also acts as an ERC20 token which represents staked ether, stETH. Tokens are minted upon deposit and burned when redeemed. stETH tokens are pegged 1:1 to the Ethers that are held by Lido. stETH token’s balances are updated when the oracle reports change in total stake every day.
+To stake ether with Lido, the user sends Ether to Lido smart contract and gets stETH tokens in return. stETH tokens are ERC20 tokens representing a tokenized staking deposit. stETH tokens can be held, traded, or sold.
 
-## Rebasing
+## stETH minting
 
-When a rebase occurs the supply of the token is increased or decreased algorithmically, based on the staking rewards(or slashing penalties) in the Eth2 chain. Rebase happens when oracles report beacon stats.
+Tokens are minted upon deposit. stETH tokens are being minted in the 1:1 ratio to the Ether deposited. In the future, it will also be possible to burn tokens when unstaking ETH after transfers are implemented in Ethereum 2.0.
 
-Rebasing mechanism implemented via "shares". Instead of storing map with account balances, Lido stores which share owned by account in the total amount of Ether controlled by the protocol.
+## stETH balance updates
 
-Balance of account calculated next way:
+Unlike ETH, stETH balances are not only updated on transactions, but also when the oracle reports change in total stake every day.
+The stETH token balance is based on the amount of Ether deposited in Lido combined with staking rewards and slashing penalties. Since the beacon chain is a separate network, Lido smart contracts cannot get direct access to it’s data. Communication between the Ethereum 1.0 part of the system and the beacon network is performed by the Lido DAO appointed oracle. The oracle monitors node operators’ beacon chain accounts and submits corresponding data to Lido’s Ethereum 1.0 smart contracts. 
+You can read more about Lido oracle contract [here](https://docs.lido.fi/contracts/lido-oracle).  
+On every update submitted by oracle, the system recalculates the stETH token ratio. If the overall staking rewards are greater than the slashing penalties, the system registers a profit. In this case, the stETH token balances increase. Slashing penalties negatively impact stETH token balances.
 
-```
-balanceOf(account) = shares[account] * totalPooledEther / totalShares
-```
+## Rebasing and shares
 
-- `shares` - map of user account shares. Every time user deposit ether, it converted to shares and added to current user shares.
+Daily rebases increase or decrease stETH total supply based on the staking rewards (or slashing penalties) in the beacon chain. No transactions are required to update stETH balances which makes this mechanism perfectly gas efficient.
+Rebasing mechanism is implemented via "shares". Instead of storing map with account balances, Lido stores what share of total stETH supply is owned by each token holder account.
 
-- `totalShares` sum of shares of all account in `shares` map
+Balance of account is being calculated as follows:
 
-- `totalPooledEther` is a sum of three types of ether owned by protocol:
+`balanceOf(account) = shares[account] * totalPooledEther / totalShares`
 
-  - buffered balance - ether stored on contract and haven't deposited to official Deposit contract yet.
-  - transient balance - ether submitted to the official Deposit contract but not yet visible in the beacon state.
-  - beacon balance - total amount of ether on validator accounts. This value reported by oracles and makes strongest impact to stETH total supply change.
+`shares` - map of user account shares. Every time user deposits Ether, it gets converted to shares and added to current user's shares.
+
+`totalShares` - total amount of shares owned by all accounts in shares map.
+
+`totalPooledEther` - total amount of Ether owned by protocol in:
+- *buffered balance* - Ether deposited into Lido contract but not yet transferred to beacon chain Deposit contract.
+- *transient balance* - Ether submitted to the beacon chain Deposit contract but not yet visible in the beacon state.
+- *beacon balance* - total amount of Ether in validators' accounts. This value reported by oracles makes strongest impact on stETH total supply change.
 
 For example, assume that we have:
 
@@ -41,23 +48,22 @@ sharesOf(Bob) -> 400
 Therefore:
 
 ```
-balanceOf(Alice) -> 2 tokens which corresponds 2 ETH
-balanceOf(Bob) -> 8 tokens which corresponds 8 ETH
+balanceOf(Alice) -> 2 stETH tokens
+balanceOf(Bob) -> 8 stETH
 ```
 
-## Beacon Stats Reporting
+# Beacon Stats Reporting
 
-One of the most important parts of protocol, it's precise and steady reported data about current balances of validators. Such reports happen once at defined period of time, called frame. Frame duration set by DAO, current value is 24 hours.
+Lido protocol relies heavily on oracles reporting beacon chain data precisely and steadily. Oracle reports come in once in a preset period of time called frame. The frame duration is set by the DAO and is currently set at 225 epochs (~24 hours).
 
-To update stats on main Lido contract oracle demands quorum to be reached.
-Quorum - is a necessary amount of reports with equal stats from offchain oracle daemons run by protocol participants.
-Quorum size and members controlled by DAO.
-If quorum wasn't reached next report can happen only at the first epoch of next frame (after 24 hours).
+Oracle collects data from off-chain oracle daemons run by protocol participants. Oracle requires quorum to be reached in order to submit data to the Lido main contract, i.e. oracle needs a certain minimum amount of identical daemons reports. Quorum size and the list of oracle members are controlled by the DAO and can be monitored [here](https://mainnet.lido.fi/#/lido-dao/0x442af784a788a5bd6f42a01ebe9f287a871243fb/).
 
-Report consists of count of validators participated in protocol - beacon validators and total amount of ether on validator accounts - beacon balance. Typically beacon balance growth from report to report, but in exceptional cases it also can drops, because of slashing.
+Oracle report contains the number of beacon chain validators participating in protocol and the total beacon balance staked. Typically the beacon balance increases from report to report, but in exceptional cases it can also drop because of slashing penalties.
 
-- When beacon balance grown between reports, protocol register profit and distribute reward of fresh minting stETH tokens between stETH holders, node operators, insurance fund and treasury. Fee distribution for node operators, insurance fund and treasury can be set by DAO.
-- When frame was ended with slashing and new beacon balance less than previous one total supply of stETH becomes less than in previous report and no rewards distributed.
+### No oracle report scenario
+
+Lido oracle collects data about rewards/penalties and reports total ETH balance to Lido staking contracts. 
+However, there is a chance of oracle not submitting report on a given day (e.g. because oracle daemons wouldn't have reached the quorum). In this case, no rebase occurs on this day, and the stETH balances stay the same until the next report arrives ~24 hours later. This next report includes up-to-date data, and stETH balances would update accordingly to catch up with the skipped day.
 
 ## View Methods
 
@@ -95,12 +101,12 @@ function totalSupply() returns (uint256)
 
 :::note
 Always equals to `getTotalPooledEther()` since token amount
-is pegged to the total amount of Ether controlled by the protocol.
+is pegged 1:1 to the total amount of Ether controlled by the protocol.
 :::
 
 ### getTotalPooledEther()
 
-Returns the entire amount of Ether controlled by the protocol
+Returns the total amount of Ether controlled by the protocol.
 
 ```sol
 function getTotalPooledEther() returns (uint256)
@@ -149,7 +155,7 @@ function getSharesByPooledEth(uint256 _ethAmount) returns (uint256)
 
 ### getPooledEthByShares()
 
-Returns the amount of Ether that corresponds to `_sharesAmount` token shares
+Returns the amount of Ether that corresponds to `_sharesAmount` token shares.
 
 ```sol
 function getPooledEthByShares(uint256 _sharesAmount) returns (uint256)
@@ -157,7 +163,7 @@ function getPooledEthByShares(uint256 _sharesAmount) returns (uint256)
 
 ### getFee()
 
-Returns staking rewards fee rate
+Returns staking rewards fee rate.
 
 ```sol
 function getFee() returns (uint16)
@@ -169,7 +175,7 @@ Fee in basis points. 10000 BP corresponding to 100%.
 
 ### getFeeDistribution()
 
-Returns fee distribution proportion
+Returns fee distribution proportion.
 
 ```sol
 function getFeeDistribution() returns (
@@ -189,7 +195,7 @@ function getFeeDistribution() returns (
 
 ### getWithdrawalCredentials()
 
-Returns current credentials to withdraw ETH on ETH 2.0 side after the phase 2 is launched
+Returns current credentials to withdraw ETH on ETH 2.0 side after the phase 2 is launched.
 
 ```sol
 function getWithdrawalCredentials() returns (bytes32)
@@ -197,7 +203,7 @@ function getWithdrawalCredentials() returns (bytes32)
 
 ### getBufferedEther()
 
-Get the amount of Ether temporary buffered on this contract balance
+Get the amount of Ether temporary buffered on this contract balance.
 
 :::note
 
