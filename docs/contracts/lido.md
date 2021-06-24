@@ -3,24 +3,27 @@
 - [Source code](https://github.com/lidofinance/lido-dao/blob/master/contracts/0.4.24/Lido.sol)
 - [Deployed contract](https://etherscan.io/address/0xae7ab96520de3a18e5e111b5eaab095312d7fe84)
 
-Lido contract is the core protocol contract acting as a liquid staking pool. The contract is responsible for Ether deposits and withdrawals, minting and burning liquid tokens, delegating funds to node operators, applying fees, and accepting updates from the oracle contract. Node Operators' logic constitutes a separate contract, [NodeOperatorsRegistry](https://docs.lido.fi/contracts/node-operators-registry).
+Lido contract is the core contract of the protocol. It acts as a liquid staking pool. The contract is responsible for Ether deposits and withdrawals, minting and burning liquid tokens, delegating funds to node operators, applying fees, and accepting updates from the oracle contract. 
+Please note, that the Node Operators logic constitutes a separate contract, [NodeOperatorsRegistry](https://docs.lido.fi/contracts/node-operators-registry).
 
-To stake ether with Lido, the user sends Ether to Lido smart contract and gets stETH tokens in return. stETH tokens are ERC20 tokens representing a tokenized staking deposit. stETH tokens can be held, traded, or sold.
+To stake ether with Lido, the user sends Ether to Lido smart contract and gets stETH tokens in return. stETH token is an interest-bearing ERC20 token representing a tokenized staking deposit. stETH tokens can be held, traded, or sold.
+
+If you need development support, join the #development channel on the [Lido community Discord server](https://discord.gg/HYHkh6sJQ9).
 
 ## stETH minting
 
-Tokens are minted upon deposit. stETH tokens are being minted in the 1:1 ratio to the Ether deposited. In the future, it will also be possible to burn tokens when unstaking ETH after transfers are implemented in Ethereum 2.0.
+Tokens are minted upon deposit. Lido mints stETH at the 1:1 ratio to the Ether being deposited. In the future, it will also be possible to burn tokens when unstaking ETH (after transfers are implemented in Ethereum 2.0, scheduled as Phase 2).
 
 ## stETH balance updates
 
 Unlike ETH, stETH balances are not only updated on transactions, but also when the oracle reports change in total stake every day.
-The stETH token balance is based on the amount of Ether deposited in Lido combined with staking rewards and slashing penalties. Since the beacon chain is a separate network, Lido smart contracts cannot get direct access to it’s data. Communication between the Ethereum 1.0 part of the system and the beacon network is performed by the Lido DAO appointed oracle. The oracle monitors node operators’ beacon chain accounts and submits corresponding data to Lido’s Ethereum 1.0 smart contracts. 
+The stETH token balance is based on the amount of Ether deposited in Lido plus staking rewards and minus slashing penalties. Since the beacon chain is a separate network, Lido smart contracts cannot get direct access to it’s data. Communication between the Ethereum 1.0 part of the system and the beacon network is performed by the Lido DAO appointed oracle. The oracle monitors node operators’ beacon chain accounts and submits corresponding data to Lido’s Ethereum 1.0 smart contracts. 
 You can read more about Lido oracle contract [here](https://docs.lido.fi/contracts/lido-oracle).  
 On every update submitted by oracle, the system recalculates the stETH token ratio. If the overall staking rewards are greater than the slashing penalties, the system registers a profit. In this case, the stETH token balances increase. Slashing penalties negatively impact stETH token balances.
 
 ## Rebasing and shares
 
-Daily rebases increase or decrease stETH total supply based on the staking rewards (or slashing penalties) in the beacon chain. No transactions are required to update stETH balances which makes this mechanism perfectly gas efficient.
+Daily rebases increase or decrease stETH total supply based on the staking rewards (or slashing penalties) in the beacon chain. No transactions are required to update stETH balances which makes this mechanism extremely gas efficient.
 Rebasing mechanism is implemented via "shares". Instead of storing map with account balances, Lido stores what share of total stETH supply is owned by each token holder account.
 
 Balance of account is being calculated as follows:
@@ -54,22 +57,22 @@ balanceOf(Bob) -> 8 stETH
 
 # Beacon Stats Reporting
 
-Lido protocol relies heavily on oracles reporting beacon chain data precisely and steadily. Oracle reports come in once in a preset period of time called frame. The frame duration is set by the DAO and is currently set at 225 epochs (~24 hours).
+Lido protocol relies heavily on oracle reporting beacon chain data precisely and steadily. Oracle reports come in once in a preset period of time called frame. The frame duration is set by the DAO and is currently set at 225 epochs (~24 hours).
 
-Oracle collects data from off-chain oracle daemons run by protocol participants. Oracle requires quorum to be reached in order to submit data to the Lido main contract, i.e. oracle needs a certain minimum amount of identical daemons reports. Quorum size and the list of oracle members are controlled by the DAO and can be monitored [here](https://mainnet.lido.fi/#/lido-dao/0x442af784a788a5bd6f42a01ebe9f287a871243fb/).
+Oracle collects data from off-chain oracle daemons run by protocol participants. Oracle requires quorum to be reached in order to submit data to the Lido main contract, i.e. oracle needs a certain minimum number of identical daemon reports. Quorum size and the list of oracle members are controlled by the DAO and can be monitored [here](https://mainnet.lido.fi/#/lido-dao/0x442af784a788a5bd6f42a01ebe9f287a871243fb/).
 
 Oracle report contains the number of beacon chain validators participating in protocol and the total beacon balance staked. Typically the beacon balance increases from report to report, but in exceptional cases it can also drop because of slashing penalties.
 
 ### No oracle report scenario
 
 Lido oracle collects data about rewards/penalties and reports total ETH balance to Lido staking contracts. 
-However, there is a chance of oracle not submitting report on a given day (e.g. because oracle daemons wouldn't have reached the quorum). In this case, no rebase occurs on this day, and the stETH balances stay the same until the next report arrives ~24 hours later. This next report includes up-to-date data, and stETH balances would update accordingly to catch up with the skipped day.
+However, there is a chance of oracle not submitting report on a given day (e.g. because oracle daemons wouldn't have reached the quorum). In this case, no rebase occurs on this day, and the stETH balances stay the same until the next report in ~24 hours. This next report includes up-to-date data, and stETH balances would update accordingly to catch up with the skipped day.
 
 ## View Methods
 
 ### name()
 
-Returns the name of the token
+Returns the name of the token.
 
 ```sol
 function name() returns (string)
@@ -77,7 +80,7 @@ function name() returns (string)
 
 ### symbol()
 
-Returns the symbol of the token, usually a shorter version of the name
+Returns the symbol of the token, usually a shorter version of the name.
 
 ```sol
 function symbol() returns (string)
@@ -113,20 +116,19 @@ function getTotalPooledEther() returns (uint256)
 ```
 
 :::note
-The sum of all ETH balances in the protocol, equals to the total supply of stETH.
+The sum of all ETH balances in the protocol, also equals the total stETH supply.
 :::
 
 ### balanceOf()
 
-Returns the amount of tokens owned by the `_account`
+Returns the amount of tokens owned by the `_account`.
 
 ```sol
 function balanceOf(address _account) returns (uint256)
 ```
 
 :::note
-Balances are dynamic and equal the `_account`'s share in the amount of the
-total Ether controlled by the protocol. See `sharesOf`.
+Balances are dynamic and equal the `_account`'s share of the total amount of Ether controlled by the protocol. See `sharesOf`.
 :::
 
 ### getTotalShares()
@@ -139,7 +141,7 @@ function getTotalShares() returns (uint256)
 
 ### sharesOf()
 
-Returns the amount of shares owned by `_account`
+Returns the amount of shares owned by `_account`.
 
 ```sol
 function sharesOf(address _account) returns (uint256)
@@ -147,7 +149,7 @@ function sharesOf(address _account) returns (uint256)
 
 ### getSharesByPooledEth()
 
-Returns the amount of shares that corresponds to `_ethAmount` protocol-controlled Ether
+Returns the amount of shares corresponding to `_ethAmount` - the amount of protocol-controlled Ether.
 
 ```sol
 function getSharesByPooledEth(uint256 _ethAmount) returns (uint256)
@@ -155,7 +157,7 @@ function getSharesByPooledEth(uint256 _ethAmount) returns (uint256)
 
 ### getPooledEthByShares()
 
-Returns the amount of Ether that corresponds to `_sharesAmount` token shares.
+Returns the amount of Ether corresponding to `_sharesAmount` - the amount of token shares.
 
 ```sol
 function getPooledEthByShares(uint256 _sharesAmount) returns (uint256)
@@ -163,7 +165,7 @@ function getPooledEthByShares(uint256 _sharesAmount) returns (uint256)
 
 ### getFee()
 
-Returns staking rewards fee rate.
+Returns fee rate applied to staking rewards by the DAO.
 
 ```sol
 function getFee() returns (uint16)
@@ -171,7 +173,7 @@ function getFee() returns (uint16)
 
 #### Returns:
 
-Fee in basis points. 10000 BP corresponding to 100%.
+Fee in basis points. 10000 BP represent 100%.
 
 ### getFeeDistribution()
 
@@ -203,7 +205,7 @@ function getWithdrawalCredentials() returns (bytes32)
 
 ### getBufferedEther()
 
-Get the amount of Ether temporary buffered on this contract balance.
+Returns the amount of Ether temporarily buffered on this contract balance.
 
 :::note
 
@@ -218,11 +220,11 @@ function getBufferedEther()  returns (uint256)
 
 #### Returns:
 
-Amount of buffered funds in wei
+Amount of buffered funds in wei.
 
 ### getDepositContract()
 
-Gets deposit contract handle
+Returns deposit contract handle.
 
 ```sol
 function getDepositContract() public view returns (IDepositContract)
@@ -230,11 +232,11 @@ function getDepositContract() public view returns (IDepositContract)
 
 #### Returns:
 
-Address of deposit contract
+Address of deposit contract.
 
 ### getOracle()
 
-Returns authorized oracle address
+Returns authorized oracle address.
 
 ```sol
 function getOracle() returns (address)
@@ -242,7 +244,7 @@ function getOracle() returns (address)
 
 ### getOperators()
 
-Gets node operators registry interface handle
+Returns node operators registry interface handle.
 
 ```sol
 function getOperators() returns (INodeOperatorsRegistry)
@@ -250,11 +252,11 @@ function getOperators() returns (INodeOperatorsRegistry)
 
 #### Returns:
 
-Address of NodeOperatorsRegistry contract
+Address of NodeOperatorsRegistry contract.
 
 ### getTreasury()
 
-Returns the treasury address
+Returns the treasury address.
 
 ```sol
 function getTreasury() returns (address)
@@ -262,7 +264,7 @@ function getTreasury() returns (address)
 
 ### getInsuranceFund()
 
-Returns the insurance fund address
+Returns the insurance fund address.
 
 ```sol
 function getInsuranceFund() returns (address)
@@ -270,7 +272,7 @@ function getInsuranceFund() returns (address)
 
 ### getBeaconStat()
 
-Returns the key values related to Beacon-side
+Returns the key values related to Beacon-side.
 
 ```sol
 function getBeaconStat() returns (
@@ -321,14 +323,14 @@ A boolean value indicating whether the operation succeeded.
 ### allowance()
 
 Returns the remaining number of tokens that `_spender` is allowed to spend
-on behalf of `_owner` through `transferFrom`. This is zero by default.
+on behalf of `_owner` through `transferFrom` (Zero by default).
 
 ```sol
 function allowance(address _owner, address _spender) returns (uint256)
 ```
 
 :::note
-This value changes when `approve` or `transferFrom` is called.
+This value changes when `approve` or `transferFrom` methods are called.
 :::
 
 #### Parameters:
@@ -340,7 +342,7 @@ This value changes when `approve` or `transferFrom` is called.
 
 ### approve()
 
-Sets `_amount` as the allowance of `_spender` over the caller's tokens
+Sets `_amount` as the allowance of `_spender` over the caller's tokens.
 
 ```sol
 function approve(address _spender, uint256 _amount) returns (bool)
@@ -363,7 +365,7 @@ Requirements:
 
 #### Returns:
 
-A boolean value indicating whether the operation succeeded
+A boolean value indicating whether the operation succeeded.
 
 ### transferFrom()
 
@@ -400,7 +402,7 @@ Requirements:
 
 #### Returns:
 
-A boolean value indicating whether the operation succeeded
+A boolean value indicating whether the operation succeeded.
 
 ### increaseAllowance()
 
@@ -430,7 +432,7 @@ Requirements:
 
 #### Returns:
 
-Returns a boolean value indicating whether the operation succeeded
+Returns a boolean value indicating whether the operation succeeded.
 
 ### decreaseAllowance()
 
@@ -465,7 +467,7 @@ Returns a boolean value indicating whether the operation succeeded
 
 ### submit()
 
-Send funds to the pool with optional \_referral parameter
+Submits funds to the pool with optional `_referral` parameter
 
 ```sol
 function submit(address _referral) returns (uint256)
@@ -479,11 +481,11 @@ function submit(address _referral) returns (uint256)
 
 #### Returns:
 
-Amount of StETH shares generated
+Amount of StETH shares generated.
 
 ### depositBufferedEther()
 
-Deposits buffered ethers to the official DepositContract. If `_maxDeposits` provided makes no more than `_maxDeposits` deposit calls
+Deposits buffered Ether to the official DepositContract. If `_maxDeposits` provided, makes no more than `_maxDeposits` deposit calls.
 
 ```sol
 function depositBufferedEther()
@@ -527,11 +529,11 @@ Requirements:
 
 #### Returns
 
-Amount of totalShares after tokens burning
+Amount of totalShares after tokens have been burnt.
 
 ### stop()
 
-Stop pool routine operations
+Stop pool routine operations.
 
 ```sol
 function stop()
@@ -539,7 +541,7 @@ function stop()
 
 ### resume()
 
-Resume pool routine operations
+Resume pool routine operations.
 
 ```sol
 function resume()
@@ -547,7 +549,7 @@ function resume()
 
 ### setFee()
 
-Set fee rate to `_feeBasisPoints` basis points. The fees are accrued when oracles report staking results
+Set fee rate to `_feeBasisPoints` basis points. The fees apply when oracle reports staking results.
 
 ```sol
 function setFee(uint16 _feeBasisPoints)
@@ -613,7 +615,7 @@ function setTreasury(address _treasury)
 ### setInsuranceFund()
 
 Set insuranceFund contract address to `_insuranceFund`.
-This contract is used to accumulate the protocol insurance fee
+This contract is used to accumulate the protocol insurance fee.
 
 ```sol
 function setInsuranceFund(address _insuranceFund)
@@ -641,7 +643,7 @@ Note that `setWithdrawalCredentials` discards all unused signing keys as the sig
 
 | Name                     | Type      | Description                                                                                 |
 | ------------------------ | --------- | ------------------------------------------------------------------------------------------- |
-| `_withdrawalCredentials` | `bytes32` | Hash of withdrawal multisignature key as accepted by the deposit_contract.deposit functione |
+| `_withdrawalCredentials` | `bytes32` | Hash of withdrawal multisignature key as accepted by the deposit_contract.deposit function. |
 
 ### withdraw()
 
@@ -652,7 +654,7 @@ function withdraw(uint256 _amount, bytes32 _pubkeyHash)
 ```
 
 :::note
-Will be upgraded to an actual implementation when withdrawals are enabled (Phase 1.5 or 2 of Eth2 launch, likely late 2021 or 2022). At the moment withdrawals are not possible in the beacon chain and there's no workaround
+Will be upgraded to an actual implementation when withdrawals are enabled (Phase 1.5 or 2 of Eth2 launch, likely late 2021 or 2022). At the moment withdrawals are not possible in the beacon chain and there's no workaround.
 :::
 
 #### Parameters
