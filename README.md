@@ -53,13 +53,13 @@ More information about document metadata fields available [there](https://docusa
 
 ### Documentation Sidebar
 
-The appereance of sidebar controlled manually via `sidebars.js` file. This file is used to:
+The appearance of sidebar controlled manually via `sidebars.js` file. This file is used to:
 
 - Group multiple related documents
 - Display a sidebar on each of those documents
 - Provide a paginated navigation, with next/previous button
 
-By default new added pages don't added to sidebar automatically. For example to add new page `faq.md` as the last item of sidebar we need modify `sidebar.js` next way:
+By default new added pages aren't added to sidebar automatically. For example to add new page `faq.md` as the last item of sidebar we need to modify `sidebar.js` next way:
 
 ```js
 module.exports = {
